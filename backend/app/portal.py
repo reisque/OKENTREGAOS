@@ -66,14 +66,13 @@ class OkEntregaClient:
             "func": "campDataOS",
             "acao": "G",
             "campos[dateTypeFilter]": "emissao",
-            "campos[datesByYearOrMonthIntermediaryFilter]": str(year),
+            "campos[datesByYearOrMonthIntermediaryFilter]": "ano atual" if year == date.today().year else str(year),
             "campos[issueSpecificDate]": f"01/01/{year} - 31/12/{year}",
             "materializada": "0",
             "usuarioClientes": "0",
             "pagina": CONSULTATION_PAGE,
         })
-        filter_payload = filter_response.json()
-        if filter_payload.get("resposta_status", {}).get("status") != 1:
+        if filter_response.status_code >= 400:
             raise PortalError("O filtro anual não pôde ser aplicado no OK Entrega.")
         response = await client.post(AJAX_PATH, data=list_data)
         payload = response.json()
