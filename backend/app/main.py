@@ -32,6 +32,19 @@ async def consultations() -> ConsultationResponse:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.get("/api/consultations/latest", response_model=ConsultationResponse)
+async def latest_consultation() -> ConsultationResponse:
+    latest = await ConsultationAudit(settings).latest()
+    if latest is None:
+        raise HTTPException(status_code=404, detail="Nenhuma consulta salva no Supabase.")
+    results, consulted_at = latest
+    return ConsultationResponse(
+        results=results,
+        consulted_at=consulted_at,
+        year=datetime.fromisoformat(consulted_at.replace("Z", "+00:00")).year,
+    )
+
+
 @app.get("/api/os/{os_number}/xml")
 async def download_xml(os_number: str) -> Response:
     try:

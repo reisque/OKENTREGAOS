@@ -11,7 +11,7 @@ Consulta anual de OS e download individual de XML do OK Entrega, com React/Vite 
 
 ## Supabase
 
-Execute a migration em `supabase/migrations/20260911_create_consultations.sql` no SQL Editor. Na primeira abertura do site, a API busca as OS do ano corrente; cada atualização busca novamente o ano inteiro e faz upsert das OS novas ou alteradas. A pesquisa é feita sobre os resultados sincronizados no navegador, sem custo adicional de serviço.
+Execute a migration em `supabase/migrations/20260911_create_consultations.sql` no SQL Editor. A primeira abertura busca as OS do ano corrente e salva os dados no Supabase. Nas aberturas seguintes, o site carrega a última consulta salva no banco, sem consultar o portal novamente. Uma nova consulta anual só acontece pelo botão de atualização ou quando completar uma hora desde a última consulta; nesse caso, as OS novas ou alteradas são gravadas por upsert. A pesquisa é feita sobre os resultados sincronizados no navegador, sem custo adicional de serviço.
 
 O site sincroniza automaticamente uma hora depois da última consulta concluída (manual ou automática). A data e a hora da última consulta ficam visíveis no topo. Os XMLs são baixados somente de forma individual para evitar travamentos no navegador.
 

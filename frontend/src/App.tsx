@@ -10,6 +10,8 @@ const formatDate = (value: string) => new Intl.DateTimeFormat('pt-BR', { dateSty
 
 export default function App() {
   const [query, setQuery] = useState('')
+  const [batchQuery, setBatchQuery] = useState('')
+  const [batchFilter, setBatchFilter] = useState<string[]>([])
   const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(false)
   const [consultedAt, setConsultedAt] = useState('')
@@ -27,27 +29,63 @@ export default function App() {
     finally { setLoading(false) }
   }
 
+  async function loadLatest() {
+    setLoading(true); setError('')
+    try {
+      const response = await fetch(`${apiUrl}/api/consultations/latest`)
+      if (response.status === 404) {
+        await sync()
+        return
+      }
+      const body: SyncResponse & { detail?: string } = await response.json()
+      if (!response.ok) throw new Error(body.detail ?? 'Não foi possível carregar a consulta salva.')
+      setResults(body.results)
+      setConsultedAt(body.consulted_at)
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Erro inesperado.') }
+    finally { setLoading(false) }
+  }
+
   useEffect(() => {
-    void sync()
+    void loadLatest()
   }, [])
   useEffect(() => {
     if (!consultedAt) return
-    const timer = window.setTimeout(() => void sync(), 60 * 60 * 1000)
+    const elapsed = Date.now() - new Date(consultedAt).getTime()
+    const remaining = Math.max(0, 60 * 60 * 1000 - elapsed)
+    const timer = window.setTimeout(() => void sync(), remaining)
     return () => window.clearTimeout(timer)
   }, [consultedAt])
 
   function download(os: string) { window.open(`${apiUrl}/api/os/${encodeURIComponent(normalizedOs(os))}/xml`, '_blank', 'noopener,noreferrer') }
 
+  function applyBatchFilter() {
+    setBatchFilter(batchQuery.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+  }
+
+  function clearBatchFilter() {
+    setBatchQuery('')
+    setBatchFilter([])
+  }
+
   const visibleResults = useMemo(() => {
+    const requestedResults = batchFilter.length
+      ? batchFilter.map(input => results.find(item => item.normalized === normalizedOs(input)) ?? {
+        input,
+        normalized: normalizedOs(input),
+        found: false,
+        has_xml: false,
+        message: 'OS não encontrada na consulta anual.',
+      })
+      : results
     const term = query.trim().toLocaleLowerCase()
-    if (!term) return results
-    return results.filter(item => Object.values(item).some(value => String(value ?? '').toLocaleLowerCase().includes(term)))
-  }, [query, results])
+    if (!term) return requestedResults
+    return requestedResults.filter(item => Object.values(item).some(value => String(value ?? '').toLocaleLowerCase().includes(term)))
+  }, [batchFilter, query, results])
   const foundCount = visibleResults.filter(item => item.found).length
 
   return <main className="page">
-    <section className="hero"><h1>Consulta de ordem de serviço</h1><p>Sincronização anual automática e gratuita</p></section>
-    <section className="panel"><div className="sync-bar"><span>{consultedAt ? `Última consulta: ${formatDate(consultedAt)}` : 'Aguardando a primeira consulta...'}</span><button type="button" onClick={() => void sync()} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''} />{loading ? 'Atualizando...' : 'Atualizar consulta'}</button></div><label htmlFor="search">Pesquisar nos resultados</label><div className="query"><div className="search-input"><Search size={18} /><input id="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquise OS, status, booking, contêiner, contratante ou depot" /></div></div>{error && <div className="error">{error}</div>}</section>
+    <section className="hero"><h1>Consulta de ordem de serviço</h1></section>
+    <section className="panel"><div className="sync-bar"><span>{consultedAt ? `Última consulta: ${formatDate(consultedAt)}` : 'Aguardando a primeira consulta...'}</span><button type="button" onClick={() => void sync()} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''} />{loading ? 'Atualizando...' : 'Atualizar consulta'}</button></div><label htmlFor="batch-search">Filtrar várias OS de uma vez</label><div className="batch-query"><textarea id="batch-search" value={batchQuery} onChange={event => setBatchQuery(event.target.value)} placeholder={'Cole uma OS por linha, por exemplo:\n6SP 558788B\n6PE 413251B'} rows={4} /><div className="batch-actions"><button type="button" onClick={applyBatchFilter} disabled={!batchQuery.trim()}>Filtrar OS</button>{batchFilter.length > 0 && <button type="button" className="secondary" onClick={clearBatchFilter}>Limpar filtro</button>}</div></div><label htmlFor="search">Pesquisar nos resultados</label><div className="query"><div className="search-input"><Search size={18} /><input id="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquise OS, status, booking, contêiner, contratante ou depot" /></div></div>{error && <div className="error">{error}</div>}</section>
     {consultedAt && <section className="results"><div className="results-head"><div><h2>Resultado da consulta</h2><span>{foundCount} encontrada(s) de {visibleResults.length} exibida(s)</span></div></div>{!results.length ? <p className="empty">Nenhuma OS foi retornada pelo portal para o ano de {new Date(consultedAt).getFullYear()}.</p> : <div className="table-scroll"><table><thead><tr><th>Ordem de serviço</th><th>Status</th><th>Booking</th><th>Contêiner</th><th>Contratante</th><th>Depot</th><th>XML</th></tr></thead><tbody>{visibleResults.map((item, index) => item.found
       ? <tr key={`${item.normalized}-${index}`}><td className="os-cell" title={item.os_number}>{item.os_number}</td><td><span className="status" title={item.status}>{item.status}</span></td><td title={item.booking}>{item.booking || '—'}</td><td>{normalizedContainer(item.container)}</td><td title={item.contractor}>{item.contractor || '—'}</td><td title={item.depot}>{item.depot || '—'}</td><td><div className="actions"><button type="button" className={item.has_xml ? '' : 'na'} disabled={!item.has_xml} onClick={() => item.has_xml && download(item.os_number!)}>{item.has_xml ? <><FileCode2 size={15} /> Baixar XML</> : 'N/A'}</button></div></td></tr>
       : <tr key={`${item.normalized}-${index}`} className="not-found"><td className="os-cell">{item.normalized}</td><td colSpan={6}>{item.message}</td></tr>
