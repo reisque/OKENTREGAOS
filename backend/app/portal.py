@@ -60,33 +60,26 @@ class OkEntregaClient:
             "component": "sys.sys.listarOS", "action": "list_os", "token": "", "cliente_id": "",
             "tipoacesso": "", "filtroOK": 1, "page": CONSULTATION_PAGE, "code": "", "status": "", "options_edit": "N",
         }
-        common = {
-            "component": "sys.sys.busca2", "action": "reloadFieldFilters", "acao": "G",
-            "campDocumentos": "", "campTipoDoc": "os", "campSerieDocumentos": "",
-            "campEmissorDoc": "", "usuarioClientes": 0, "pagina": CONSULTATION_PAGE,
-        }
-        # Different portal releases use different values for these select fields.
-        variants = (
-            {"campTipoData": "emissao_os", "campPeriodo": str(year)},
-            {"campTipoData": "EMISSAO_OS", "campPeriodo": str(year)},
-            {"campTipoData": "1", "campPeriodo": str(year)},
-            {"tipoData": "emissao_os", "periodo": str(year)},
-            {"tipo_data": "emissao_os", "periodo": str(year)},
-            {"campDataInicial": f"01/01/{year}", "campDataFinal": f"31/12/{year}"},
-        )
-        for variant in variants:
-            filtered = await client.post(AJAX_PATH, data={**common, **variant})
-            filtered_payload = filtered.json()
-            if filtered_payload.get("resposta_status", {}).get("status") != 1:
-                continue
-            response = await client.post(AJAX_PATH, data=list_data)
-            payload = response.json()
-            if payload.get("resposta_status", {}).get("status") != 1:
-                raise PortalError(payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
-            rows = payload.get("DATA", [])
-            if rows:
-                return rows
-        return []
+        filter_response = await client.post(AJAX_PATH, data={
+            "component": "sys.sys.busca2",
+            "action": "reloadFieldFilters",
+            "func": "campDataOS",
+            "acao": "G",
+            "campos[dateTypeFilter]": "emissao",
+            "campos[datesByYearOrMonthIntermediaryFilter]": str(year),
+            "campos[issueSpecificDate]": f"01/01/{year} - 31/12/{year}",
+            "materializada": "0",
+            "usuarioClientes": "0",
+            "pagina": CONSULTATION_PAGE,
+        })
+        filter_payload = filter_response.json()
+        if filter_payload.get("resposta_status", {}).get("status") != 1:
+            raise PortalError("O filtro anual não pôde ser aplicado no OK Entrega.")
+        response = await client.post(AJAX_PATH, data=list_data)
+        payload = response.json()
+        if payload.get("resposta_status", {}).get("status") != 1:
+            raise PortalError(payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
+        return payload.get("DATA", [])
 
     async def list_year(self, year: int) -> list[OsResult]:
         client = await self._authenticated_client()
