@@ -16,9 +16,9 @@ class ConsultationAudit:
         if settings.supabase_url and settings.supabase_service_role_key:
             self.client = create_client(settings.supabase_url, settings.supabase_service_role_key)
 
-    async def record(self, results: list[OsResult], consulted_at: str) -> list[OsResult]:
+    async def record(self, results: list[OsResult], consulted_at: str) -> tuple[list[OsResult], list[OsResult]]:
         if not self.client:
-            return []
+            return results, []
         existing: dict[str, dict[str, Any]] = {}
         try:
             offset = 0
@@ -48,6 +48,13 @@ class ConsultationAudit:
                 )
             )
         ]
+        persisted_results = [
+            result.model_copy(update={
+                "cte_detected_at": existing.get(result.normalized, {}).get("cte_detected_at")
+                or (consulted_at if result.has_xml else None),
+            })
+            for result in results
+        ]
         rows = [{
             "os_number": result.normalized, "found": result.found, "status": result.status,
             "booking": result.booking, "container": result.container,
@@ -61,14 +68,14 @@ class ConsultationAudit:
             "xml_notified_at": existing.get(result.normalized, {}).get("xml_notified_at"),
         } for result in results]
         if not rows:
-            return newly_available
+            return persisted_results, newly_available
         try:
             await asyncio.to_thread(self.client.table("okentrega_consultations").upsert(rows, on_conflict="os_number").execute)
         except Exception as exc:
             logger.exception("Supabase upsert failed")
             detail = str(exc).replace("\n", " ")[:300]
             raise RuntimeError(f"Não foi possível salvar a consulta no Supabase: {detail}") from exc
-        return newly_available
+        return persisted_results, newly_available
 
     async def mark_xmls_notified(self, results: list[OsResult], notified_at: str) -> None:
         if not self.client or not results:

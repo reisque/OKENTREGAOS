@@ -26,11 +26,11 @@ async def consultations() -> ConsultationResponse:
     try:
         results = await OkEntregaClient(settings).list_year(year)
         audit = ConsultationAudit(settings)
-        newly_available = await audit.record(results, consulted_at)
+        persisted_results, newly_available = await audit.record(results, consulted_at)
         if newly_available:
             await send_new_xml_email(settings, newly_available, consulted_at)
             await audit.mark_xmls_notified(newly_available, consulted_at)
-        return ConsultationResponse(results=results, consulted_at=consulted_at, year=year)
+        return ConsultationResponse(results=persisted_results, consulted_at=consulted_at, year=year)
     except PortalError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:
