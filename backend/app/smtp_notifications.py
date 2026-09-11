@@ -39,4 +39,7 @@ async def send_new_xml_email(settings: Settings, results: list[OsResult], detect
     try:
         await asyncio.to_thread(_send_email, settings, message)
     except (OSError, smtplib.SMTPException) as exc:
-        raise NotificationError("O Gmail recusou o envio do e-mail de novos XMLs.") from exc
+        detail = str(exc).replace("\n", " ")[:240]
+        raise NotificationError(
+            f"O Gmail recusou o envio do e-mail de novos XMLs: {detail}"
+        ) from exc
