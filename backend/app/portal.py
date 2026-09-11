@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import urlparse
 
 import httpx
@@ -18,6 +18,41 @@ class PortalError(Exception):
 
 def normalize_os(value: str) -> str:
     return re.sub(r"\s+", "", value).upper()
+
+
+def first_value(row: dict, *names: str) -> str | None:
+    for name in names:
+        value = row.get(name)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def date_field(row: dict) -> str | None:
+    value = first_value(
+        row, "DATAINTEGRACAO", "DATA_INTEGRACAO", "DATACRIACAO", "DATA_CRIACAO",
+        "DATAOS", "DATA_EMISSAO", "DATAEMISSAO",
+    )
+    if value:
+        return value
+    for key, candidate in row.items():
+        normalized_key = re.sub(r"[^A-Z]", "", str(key).upper())
+        if "DATA" in normalized_key and ("INTEGR" in normalized_key or "CRIAC" in normalized_key or "EMIS" in normalized_key):
+            if candidate is not None and str(candidate).strip():
+                return str(candidate).strip()
+    return None
+
+
+def normalize_portal_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip()
+    for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt).isoformat()
+        except ValueError:
+            continue
+    return text
 
 
 class OkEntregaClient:
@@ -96,6 +131,7 @@ class OkEntregaClient:
             status=row.get("STATUSOS"), booking=row.get("BOOKING"),
             container=row.get("RESULTADOVARCHAR"), contractor=row.get("NOMECLIENTEPROPOSTA"),
             depot=row.get("DEPOT"), has_xml=".xml" in str(row.get("ARQUIVO", "")).lower(),
+            integration_date=normalize_portal_date(date_field(row)),
             found=True,
         )
 

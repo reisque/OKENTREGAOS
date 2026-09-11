@@ -19,11 +19,34 @@ class ConsultationAudit:
     async def record(self, results: list[OsResult], consulted_at: str) -> None:
         if not self.client:
             return
+        existing: dict[str, dict[str, Any]] = {}
+        try:
+            offset = 0
+            while True:
+                response = await asyncio.to_thread(
+                    self.client.table("okentrega_consultations")
+                    .select("os_number,has_xml,cte_detected_at")
+                    .range(offset, offset + 999)
+                    .execute
+                )
+                page = response.data or []
+                existing.update({str(row["os_number"]): row for row in page})
+                if len(page) < 1000:
+                    break
+                offset += 1000
+        except Exception as exc:
+            logger.exception("Supabase previous consultation read failed")
+            raise RuntimeError("Não foi possível comparar a disponibilidade anterior dos XMLs.") from exc
         rows = [{
             "os_number": result.normalized, "found": result.found, "status": result.status,
             "booking": result.booking, "container": result.container,
             "contractor": result.contractor, "depot": result.depot,
+            "integration_date": result.integration_date,
             "has_xml": result.has_xml, "queried_at": consulted_at,
+            "cte_detected_at": (
+                existing.get(result.normalized, {}).get("cte_detected_at")
+                or (consulted_at if result.has_xml else None)
+            ),
         } for result in results]
         if not rows:
             return
@@ -44,7 +67,7 @@ class ConsultationAudit:
             while True:
                 response = await asyncio.to_thread(
                     self.client.table("okentrega_consultations")
-                    .select("os_number,found,status,booking,container,contractor,depot,has_xml,queried_at")
+                    .select("os_number,found,status,booking,container,contractor,depot,integration_date,cte_detected_at,has_xml,queried_at")
                     .order("queried_at", desc=True)
                     .range(offset, offset + page_size - 1)
                     .execute
@@ -67,6 +90,8 @@ class ConsultationAudit:
                     container=row.get("container"),
                     contractor=row.get("contractor"),
                     depot=row.get("depot"),
+                    integration_date=row.get("integration_date"),
+                    cte_detected_at=row.get("cte_detected_at"),
                     has_xml=bool(row.get("has_xml")),
                     found=bool(row.get("found", True)),
                 )
