@@ -6,7 +6,7 @@ from fastapi.responses import Response
 from app.audit import ConsultationAudit
 from app.config import get_settings
 from app.models import ConsultationResponse, OsResult
-from app.notifications import NotificationError, send_new_xml_email
+from app.smtp_notifications import NotificationError, send_new_xml_email
 from app.portal import OkEntregaClient, PortalError
 
 settings = get_settings()
