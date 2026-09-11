@@ -60,7 +60,8 @@ class OkEntregaClient:
             "component": "sys.sys.busca2", "action": "reloadFieldFilters", "acao": "G",
             "campDocumentos": "", "campTipoDoc": "os", "campSerieDocumentos": "",
             "campEmissorDoc": "", "usuarioClientes": 0, "pagina": CONSULTATION_PAGE,
-            "campDataInicial": f"01/01/{year}", "campDataFinal": f"31/12/{year}",
+            # The portal's UI uses a date-type selector plus a year period.
+            "campTipoData": "emissao_os", "campPeriodo": str(year),
         }
         filtered = await client.post(AJAX_PATH, data=filter_data)
         if filtered.json().get("resposta_status", {}).get("status") != 1:
@@ -73,19 +74,7 @@ class OkEntregaClient:
         payload = response.json()
         if payload.get("resposta_status", {}).get("status") != 1:
             raise PortalError(payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
-        rows = payload.get("DATA", [])
-        if rows:
-            return rows
-
-        # The portal accepts the filter request but some accounts do not expose
-        # date fields through this endpoint. Retry the same list without dates.
-        await client.post(AJAX_PATH, data={key: value for key, value in filter_data.items()
-                                           if key not in {"campDataInicial", "campDataFinal"}})
-        fallback = await client.post(AJAX_PATH, data=list_data)
-        fallback_payload = fallback.json()
-        if fallback_payload.get("resposta_status", {}).get("status") != 1:
-            raise PortalError(fallback_payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
-        return fallback_payload.get("DATA", [])
+        return payload.get("DATA", [])
 
     async def list_year(self, year: int) -> list[OsResult]:
         client = await self._authenticated_client()
