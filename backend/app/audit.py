@@ -24,6 +24,8 @@ class ConsultationAudit:
             "contractor": result.contractor, "depot": result.depot,
             "has_xml": result.has_xml, "queried_at": consulted_at,
         } for result in results]
+        if not rows:
+            return
         try:
             await asyncio.to_thread(self.client.table("okentrega_consultations").upsert(rows, on_conflict="os_number").execute)
         except Exception as exc:
