@@ -56,22 +56,36 @@ class OkEntregaClient:
             ) from exc
 
     async def _list_rows(self, client: httpx.AsyncClient, year: int) -> list[dict]:
-        filtered = await client.post(AJAX_PATH, data={
+        filter_data = {
             "component": "sys.sys.busca2", "action": "reloadFieldFilters", "acao": "G",
             "campDocumentos": "", "campTipoDoc": "os", "campSerieDocumentos": "",
             "campEmissorDoc": "", "usuarioClientes": 0, "pagina": CONSULTATION_PAGE,
             "campDataInicial": f"01/01/{year}", "campDataFinal": f"31/12/{year}",
-        })
+        }
+        filtered = await client.post(AJAX_PATH, data=filter_data)
         if filtered.json().get("resposta_status", {}).get("status") != 1:
             raise PortalError("O filtro não pôde ser aplicado no OK Entrega.")
-        response = await client.post(AJAX_PATH, data={
+        list_data = {
             "component": "sys.sys.listarOS", "action": "list_os", "token": "", "cliente_id": "",
             "tipoacesso": "", "filtroOK": 1, "page": CONSULTATION_PAGE, "code": "", "status": "", "options_edit": "N",
-        })
+        }
+        response = await client.post(AJAX_PATH, data=list_data)
         payload = response.json()
         if payload.get("resposta_status", {}).get("status") != 1:
             raise PortalError(payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
-        return payload.get("DATA", [])
+        rows = payload.get("DATA", [])
+        if rows:
+            return rows
+
+        # The portal accepts the filter request but some accounts do not expose
+        # date fields through this endpoint. Retry the same list without dates.
+        await client.post(AJAX_PATH, data={key: value for key, value in filter_data.items()
+                                           if key not in {"campDataInicial", "campDataFinal"}})
+        fallback = await client.post(AJAX_PATH, data=list_data)
+        fallback_payload = fallback.json()
+        if fallback_payload.get("resposta_status", {}).get("status") != 1:
+            raise PortalError(fallback_payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
+        return fallback_payload.get("DATA", [])
 
     async def list_year(self, year: int) -> list[OsResult]:
         client = await self._authenticated_client()
