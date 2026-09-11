@@ -27,12 +27,10 @@ async def consultations(request: ConsultationRequest) -> list[OsResult]:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@app.get("/api/os/{os_number}/documents/{document_type}")
-async def download_document(os_number: str, document_type: str) -> Response:
-    if document_type not in {"xml", "pdf"}:
-        raise HTTPException(status_code=404, detail="Tipo de documento inválido.")
+@app.get("/api/os/{os_number}/xml")
+async def download_xml(os_number: str) -> Response:
     try:
-        content, filename, media_type = await OkEntregaClient(settings).download_document(os_number, document_type)
+        content, filename, media_type = await OkEntregaClient(settings).download_xml(os_number)
     except PortalError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(content=content, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})

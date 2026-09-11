@@ -69,11 +69,11 @@ class OkEntregaClient:
             row = await self._find_row(client, normalized)
             if not row:
                 return OsResult(input=raw_os, normalized=normalized, found=False, message="OS não encontrada.")
-            return OsResult(input=raw_os, normalized=normalized, os_number=row.get("NUMEROOS"), status=row.get("STATUSOS"), booking=row.get("BOOKING"), container=row.get("RESULTADOVARCHAR"), contractor=row.get("NOMECLIENTEPROPOSTA"), depot=row.get("DEPOT"), found=True)
+            return OsResult(input=raw_os, normalized=normalized, os_number=row.get("NUMEROOS"), status=row.get("STATUSOS"), booking=row.get("BOOKING"), container=row.get("RESULTADOVARCHAR"), contractor=row.get("NOMECLIENTEPROPOSTA"), depot=row.get("DEPOT"), has_xml=".xml" in str(row.get("ARQUIVO", "")).lower(), found=True)
         finally:
             await client.aclose()
 
-    async def download_document(self, raw_os: str, document_type: str) -> tuple[bytes, str, str]:
+    async def download_xml(self, raw_os: str) -> tuple[bytes, str, str]:
         normalized = normalize_os(raw_os)
         client = await self._authenticated_client()
         try:
@@ -84,19 +84,18 @@ class OkEntregaClient:
             payload = response.json()
             if payload.get("resposta_status", {}).get("status") != 1:
                 raise PortalError("Não foi possível abrir os detalhes da OS.")
-            source = payload["resposta_dados"].get("cte_mult", "") if document_type == "xml" else payload["resposta_dados"].get("pdf_os", "")
+            source = payload["resposta_dados"].get("cte_mult", "")
             paths = re.findall(r"abrir_pdf\('([^']+)'", source)
-            path = next((item for item in paths if item.lower().endswith(f".{document_type}")), None)
+            path = next((item for item in paths if item.lower().endswith(".xml")), None)
             if not path:
-                raise PortalError(f"Arquivo {document_type.upper()} indisponível para esta OS.")
+                raise PortalError("Arquivo XML indisponível para esta OS.")
             moved = await client.post(AJAX_PATH, data={"component": "sys.sys.consOS", "action": "moverFTP", "href": path})
             href = moved.json().get("resposta_dados", {}).get("href")
             if not href:
                 raise PortalError("O arquivo não pôde ser preparado pelo OK Entrega.")
             file_response = await client.get(href if urlparse(href).scheme else f"{BASE_URL}{href}")
             file_response.raise_for_status()
-            media_type = "application/xml" if document_type == "xml" else "application/pdf"
-            return file_response.content, f"{normalized}.{document_type}", media_type
+            return file_response.content, f"{normalized}.xml", "application/xml"
         finally:
             await client.aclose()
 

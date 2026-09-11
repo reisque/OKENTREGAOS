@@ -14,5 +14,6 @@ class OsResult(BaseModel):
     container: str | None = None
     contractor: str | None = None
     depot: str | None = None
+    has_xml: bool = False
     found: bool
     message: str | None = None
