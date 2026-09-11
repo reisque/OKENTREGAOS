@@ -21,6 +21,7 @@ export default function App() {
   const [integrationEnd, setIntegrationEnd] = useState('')
   const [cteStart, setCteStart] = useState('')
   const [cteEnd, setCteEnd] = useState('')
+  const [page, setPage] = useState(1)
   const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(false)
   const [consultedAt, setConsultedAt] = useState('')
@@ -34,6 +35,7 @@ export default function App() {
       if (!response.ok) throw new Error(body.detail ?? 'Não foi possível consultar as OS.')
       setResults((body as SyncResponse).results)
       setConsultedAt((body as SyncResponse).consulted_at)
+      setPage(1)
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Erro inesperado.') }
     finally { setLoading(false) }
   }
@@ -69,11 +71,13 @@ export default function App() {
 
   function applyBatchFilter() {
     setBatchFilter(batchQuery.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+    setPage(1)
   }
 
   function clearBatchFilter() {
     setBatchQuery('')
     setBatchFilter([])
+    setPage(1)
   }
 
   function clearDateFilters() {
@@ -106,14 +110,17 @@ export default function App() {
       && inDateRange(item.cte_detected_at, cteStart, cteEnd)
       && (!term || Object.values(item).some(value => String(value ?? '').toLocaleLowerCase().includes(term))))
   }, [batchFilter, cteEnd, cteStart, integrationEnd, integrationStart, query, results])
+  const pageSize = 100
+  const pageCount = Math.max(1, Math.ceil(visibleResults.length / pageSize))
+  const pageResults = visibleResults.slice((page - 1) * pageSize, page * pageSize)
   const foundCount = visibleResults.filter(item => item.found).length
 
   return <main className="page">
     <section className="hero"><h1>Consulta de ordem de serviço</h1></section>
-    <section className="panel"><div className="sync-bar"><span>{consultedAt ? `Última consulta: ${formatDate(consultedAt)}` : 'Aguardando a primeira consulta...'}</span><button type="button" onClick={() => void sync()} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''} />{loading ? 'Atualizando...' : 'Atualizar consulta'}</button></div><label htmlFor="batch-search">Filtrar várias OS de uma vez</label><div className="batch-query"><textarea id="batch-search" value={batchQuery} onChange={event => setBatchQuery(event.target.value)} placeholder={'Cole uma OS por linha, por exemplo:\n6SP 558788B\n6PE 413251B'} rows={4} /><div className="batch-actions"><button type="button" onClick={applyBatchFilter} disabled={!batchQuery.trim()}>Filtrar OS</button>{batchFilter.length > 0 && <button type="button" className="secondary" onClick={clearBatchFilter}>Limpar filtro</button>}</div></div><div className="date-filters"><div><label htmlFor="integration-start">Integração da OS: início</label><input id="integration-start" type="date" value={integrationStart} onChange={event => setIntegrationStart(event.target.value)} /></div><div><label htmlFor="integration-end">Integração da OS: fim</label><input id="integration-end" type="date" value={integrationEnd} onChange={event => setIntegrationEnd(event.target.value)} /></div><div><label htmlFor="cte-start">Detecção do CTE: início</label><input id="cte-start" type="date" value={cteStart} onChange={event => setCteStart(event.target.value)} /></div><div><label htmlFor="cte-end">Detecção do CTE: fim</label><input id="cte-end" type="date" value={cteEnd} onChange={event => setCteEnd(event.target.value)} /></div><button type="button" className="clear-date-filters" onClick={clearDateFilters} disabled={!integrationStart && !integrationEnd && !cteStart && !cteEnd}>Limpar datas</button></div><label htmlFor="search">Pesquisar nos resultados</label><div className="query"><div className="search-input"><Search size={18} /><input id="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquise OS, status, booking, contêiner, contratante ou depot" /></div></div>{error && <div className="error">{error}</div>}</section>
-    {consultedAt && <section className="results"><div className="results-head"><div><h2>Resultado da consulta</h2><span>{foundCount} encontrada(s) de {visibleResults.length} exibida(s)</span></div></div>{!results.length ? <p className="empty">Nenhuma OS foi retornada pelo portal para o ano de {new Date(consultedAt).getFullYear()}.</p> : <div className="table-scroll"><table><thead><tr><th>Ordem de serviço</th><th>Data integração</th><th>Status</th><th>Data do CTE</th><th>Booking</th><th>Contêiner</th><th>Contratante</th><th>Depot</th><th>XML</th></tr></thead><tbody>{visibleResults.map((item, index) => item.found
+    <section className="panel"><div className="sync-bar"><span>{consultedAt ? `Última consulta: ${formatDate(consultedAt)}` : 'Aguardando a primeira consulta...'}</span><button type="button" onClick={() => void sync()} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''} />{loading ? 'Atualizando...' : 'Atualizar consulta'}</button></div><label htmlFor="batch-search">Filtrar várias OS de uma vez</label><div className="batch-query"><textarea id="batch-search" value={batchQuery} onChange={event => setBatchQuery(event.target.value)} placeholder={'Cole uma OS por linha, por exemplo:\n6SP 558788B\n6PE 413251B'} rows={4} /><div className="batch-actions"><button type="button" onClick={applyBatchFilter} disabled={!batchQuery.trim()}>Filtrar OS</button>{batchFilter.length > 0 && <button type="button" className="secondary" onClick={clearBatchFilter}>Limpar filtro</button>}</div></div><div className="date-filters"><div><label htmlFor="integration-start">Integração da OS: início</label><input id="integration-start" type="date" value={integrationStart} onChange={event => { setIntegrationStart(event.target.value); setPage(1) }} /></div><div><label htmlFor="integration-end">Integração da OS: fim</label><input id="integration-end" type="date" value={integrationEnd} onChange={event => { setIntegrationEnd(event.target.value); setPage(1) }} /></div><div><label htmlFor="cte-start">Detecção do CTE: início</label><input id="cte-start" type="date" value={cteStart} onChange={event => { setCteStart(event.target.value); setPage(1) }} /></div><div><label htmlFor="cte-end">Detecção do CTE: fim</label><input id="cte-end" type="date" value={cteEnd} onChange={event => { setCteEnd(event.target.value); setPage(1) }} /></div><button type="button" className="clear-date-filters" onClick={() => { clearDateFilters(); setPage(1) }} disabled={!integrationStart && !integrationEnd && !cteStart && !cteEnd}>Limpar datas</button></div><label htmlFor="search">Pesquisar nos resultados</label><div className="query"><div className="search-input"><Search size={18} /><input id="search" value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} placeholder="Pesquise OS, status, booking, contêiner, contratante ou depot" /></div></div>{error && <div className="error">{error}</div>}</section>
+    {consultedAt && <section className="results"><div className="results-head"><div><h2>Resultado da consulta</h2><span>{foundCount} encontrada(s) de {visibleResults.length} exibida(s)</span></div></div>{!results.length ? <p className="empty">Nenhuma OS foi retornada pelo portal para o ano de {new Date(consultedAt).getFullYear()}.</p> : <><div className="table-scroll"><table><thead><tr><th>Ordem de serviço</th><th>Data integração</th><th>Status</th><th>Data do CTE</th><th>Booking</th><th>Contêiner</th><th>Contratante</th><th>Depot</th><th>XML</th></tr></thead><tbody>{pageResults.map((item, index) => item.found
       ? <tr key={`${item.normalized}-${index}`}><td className="os-cell" title={item.os_number}>{item.os_number}</td><td className="date-cell">{item.integration_date ? formatDate(item.integration_date) : '—'}</td><td><span className="status" title={item.status}>{item.status}</span></td><td className="date-cell">{item.cte_detected_at ? formatDate(item.cte_detected_at) : '—'}</td><td title={item.booking}>{item.booking || '—'}</td><td>{normalizedContainer(item.container)}</td><td title={item.contractor}>{item.contractor || '—'}</td><td title={item.depot}>{item.depot || '—'}</td><td><div className="actions"><button type="button" className={item.has_xml ? '' : 'na'} disabled={!item.has_xml} onClick={() => item.has_xml && download(item.os_number!)}>{item.has_xml ? <><FileCode2 size={15} /> Baixar XML</> : 'N/A'}</button></div></td></tr>
       : <tr key={`${item.normalized}-${index}`} className="not-found"><td className="os-cell">{item.normalized}</td><td colSpan={6}>{item.message}</td></tr>
-    )}</tbody></table></div>}</section>}
+    )}</tbody></table></div><div className="pagination"><button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={page === 1}>Anterior</button><span>Página {page} de {pageCount}</span><button type="button" onClick={() => setPage(current => Math.min(pageCount, current + 1))} disabled={page >= pageCount}>Próxima</button></div></>}</section>}
   </main>
 }
