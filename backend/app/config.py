@@ -11,10 +11,10 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:5173"
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
-    smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    smtp_username: str | None = None
-    smtp_password: str | None = None
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_refresh_token: str | None = None
+    gmail_sender: str = "caiqueteles.uni@gmail.com"
     notification_email: str | None = None
 
     @property
