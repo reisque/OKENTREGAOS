@@ -1,0 +1,104 @@
+import asyncio
+import re
+from urllib.parse import urlparse
+
+import httpx
+
+from app.config import Settings
+from app.models import OsResult
+
+BASE_URL = "https://www.okentrega.com.br"
+AJAX_PATH = "/assets/system/sys.ajax.php8"
+CONSULTATION_PAGE = "cons.os2.php8"
+
+
+class PortalError(Exception):
+    pass
+
+
+def normalize_os(value: str) -> str:
+    return re.sub(r"\s+", "", value).upper()
+
+
+class OkEntregaClient:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def _authenticated_client(self) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(base_url=BASE_URL, follow_redirects=True, timeout=45)
+        await client.get("/login2.php")
+        response = await client.post("/assets/system/sys.ajax.php", data={
+            "component": "sys.sys.login", "action": "RedirecionarLogin",
+            "email": self.settings.okentrega_email, "password": self.settings.okentrega_password,
+            "pgredirect": "", "cliente_id": "", "elemento": "", "tipoacesso": "TRANSPORTADORA",
+        })
+        payload = response.json()
+        if payload.get("resposta_status", {}).get("status") != 1:
+            await client.aclose()
+            raise PortalError("Não foi possível autenticar no OK Entrega.")
+        details = payload["resposta_dados"]
+        await client.post("/assets/application/cons.os2.php8", data={
+            "id": details["dados"]["id"], "camp_acesso_tipo": "TRANSPORTADORA",
+            "cliente_id": details["redirect"]["cliente_id"], "user_id": details["redirect"]["user_id"],
+        })
+        return client
+
+    async def _find_row(self, client: httpx.AsyncClient, normalized: str) -> dict | None:
+        filtered = await client.post(AJAX_PATH, data={
+            "component": "sys.sys.busca2", "action": "reloadFieldFilters", "acao": "G",
+            "campDocumentos": normalized, "campTipoDoc": "os", "campSerieDocumentos": "",
+            "campEmissorDoc": "", "usuarioClientes": 0, "pagina": CONSULTATION_PAGE,
+        })
+        if filtered.json().get("resposta_status", {}).get("status") != 1:
+            raise PortalError("O filtro não pôde ser aplicado no OK Entrega.")
+        response = await client.post(AJAX_PATH, data={
+            "component": "sys.sys.listarOS", "action": "list_os", "token": "", "cliente_id": "",
+            "tipoacesso": "", "filtroOK": 1, "page": CONSULTATION_PAGE, "code": "", "status": "", "options_edit": "N",
+        })
+        payload = response.json()
+        if payload.get("resposta_status", {}).get("status") != 1:
+            raise PortalError(payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
+        return next((row for row in payload.get("DATA", []) if normalize_os(row.get("NUMEROOS", "")) == normalized), None)
+
+    async def consult(self, raw_os: str) -> OsResult:
+        normalized = normalize_os(raw_os)
+        if not normalized:
+            return OsResult(input=raw_os, normalized="", found=False, message="Informe uma OS válida.")
+        client = await self._authenticated_client()
+        try:
+            row = await self._find_row(client, normalized)
+            if not row:
+                return OsResult(input=raw_os, normalized=normalized, found=False, message="OS não encontrada.")
+            return OsResult(input=raw_os, normalized=normalized, os_number=row.get("NUMEROOS"), status=row.get("STATUSOS"), booking=row.get("BOOKING"), container=row.get("RESULTADOVARCHAR"), contractor=row.get("NOMECLIENTEPROPOSTA"), depot=row.get("DEPOT"), found=True)
+        finally:
+            await client.aclose()
+
+    async def download_document(self, raw_os: str, document_type: str) -> tuple[bytes, str, str]:
+        normalized = normalize_os(raw_os)
+        client = await self._authenticated_client()
+        try:
+            row = await self._find_row(client, normalized)
+            if not row:
+                raise PortalError("OS não encontrada.")
+            response = await client.post(AJAX_PATH, data={"component": "sys.sys.consOS", "action": "primeira_aba", "os_id": row["OS_CLIENTE_ID"], "page": CONSULTATION_PAGE})
+            payload = response.json()
+            if payload.get("resposta_status", {}).get("status") != 1:
+                raise PortalError("Não foi possível abrir os detalhes da OS.")
+            source = payload["resposta_dados"].get("cte_mult", "") if document_type == "xml" else payload["resposta_dados"].get("pdf_os", "")
+            paths = re.findall(r"abrir_pdf\('([^']+)'", source)
+            path = next((item for item in paths if item.lower().endswith(f".{document_type}")), None)
+            if not path:
+                raise PortalError(f"Arquivo {document_type.upper()} indisponível para esta OS.")
+            moved = await client.post(AJAX_PATH, data={"component": "sys.sys.consOS", "action": "moverFTP", "href": path})
+            href = moved.json().get("resposta_dados", {}).get("href")
+            if not href:
+                raise PortalError("O arquivo não pôde ser preparado pelo OK Entrega.")
+            file_response = await client.get(href if urlparse(href).scheme else f"{BASE_URL}{href}")
+            file_response.raise_for_status()
+            media_type = "application/xml" if document_type == "xml" else "application/pdf"
+            return file_response.content, f"{normalized}.{document_type}", media_type
+        finally:
+            await client.aclose()
+
+    async def consult_many(self, values: list[str]) -> list[OsResult]:
+        return await asyncio.gather(*(self.consult(value) for value in values))
