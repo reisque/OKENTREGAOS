@@ -38,13 +38,22 @@ class ConsultationAudit:
         if not self.client:
             return None
         try:
-            response = await asyncio.to_thread(
-                self.client.table("okentrega_consultations")
-                .select("os_number,found,status,booking,container,contractor,depot,has_xml,queried_at")
-                .order("queried_at", desc=True)
-                .execute
-            )
-            rows: list[dict[str, Any]] = response.data or []
+            rows: list[dict[str, Any]] = []
+            page_size = 1000
+            offset = 0
+            while True:
+                response = await asyncio.to_thread(
+                    self.client.table("okentrega_consultations")
+                    .select("os_number,found,status,booking,container,contractor,depot,has_xml,queried_at")
+                    .order("queried_at", desc=True)
+                    .range(offset, offset + page_size - 1)
+                    .execute
+                )
+                page: list[dict[str, Any]] = response.data or []
+                rows.extend(page)
+                if len(page) < page_size:
+                    break
+                offset += page_size
             if not rows:
                 return None
             consulted_at = str(rows[0]["queried_at"])
