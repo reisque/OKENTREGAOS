@@ -1,9 +1,12 @@
 import asyncio
+import logging
 
 from supabase import Client, create_client
 
 from app.config import Settings
 from app.models import OsResult
+
+logger = logging.getLogger(__name__)
 
 
 class ConsultationAudit:
@@ -24,4 +27,6 @@ class ConsultationAudit:
         try:
             await asyncio.to_thread(self.client.table("okentrega_consultations").upsert(rows, on_conflict="os_number").execute)
         except Exception as exc:
-            raise RuntimeError("Não foi possível salvar a consulta.") from exc
+            logger.exception("Supabase upsert failed")
+            detail = str(exc).replace("\n", " ")[:300]
+            raise RuntimeError(f"Não foi possível salvar a consulta no Supabase: {detail}") from exc
