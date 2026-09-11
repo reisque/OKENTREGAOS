@@ -25,23 +25,35 @@ class OkEntregaClient:
         self.settings = settings
 
     async def _authenticated_client(self) -> httpx.AsyncClient:
-        client = httpx.AsyncClient(base_url=BASE_URL, follow_redirects=True, timeout=45)
-        await client.get("/login2.php")
-        response = await client.post("/assets/system/sys.ajax.php", data={
-            "component": "sys.sys.login", "action": "RedirecionarLogin",
-            "email": self.settings.okentrega_email, "password": self.settings.okentrega_password,
-            "pgredirect": "", "cliente_id": "", "elemento": "", "tipoacesso": "TRANSPORTADORA",
-        })
-        payload = response.json()
-        if payload.get("resposta_status", {}).get("status") != 1:
+        client = httpx.AsyncClient(
+            base_url=BASE_URL,
+            follow_redirects=True,
+            timeout=45,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; OKEntregaConsulta/1.0)"},
+        )
+        try:
+            await client.get("/login2.php")
+            response = await client.post("/assets/system/sys.ajax.php", data={
+                "component": "sys.sys.login", "action": "RedirecionarLogin",
+                "email": self.settings.okentrega_email, "password": self.settings.okentrega_password,
+                "pgredirect": "", "cliente_id": "", "elemento": "", "tipoacesso": "TRANSPORTADORA",
+            })
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("resposta_status", {}).get("status") != 1:
+                raise PortalError("Não foi possível autenticar no OK Entrega.")
+            details = payload["resposta_dados"]
+            await client.post("/assets/application/cons.os2.php8", data={
+                "id": details["dados"]["id"], "camp_acesso_tipo": "TRANSPORTADORA",
+                "cliente_id": details["redirect"]["cliente_id"], "user_id": details["redirect"]["user_id"],
+            })
+            return client
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             await client.aclose()
-            raise PortalError("Não foi possível autenticar no OK Entrega.")
-        details = payload["resposta_dados"]
-        await client.post("/assets/application/cons.os2.php8", data={
-            "id": details["dados"]["id"], "camp_acesso_tipo": "TRANSPORTADORA",
-            "cliente_id": details["redirect"]["cliente_id"], "user_id": details["redirect"]["user_id"],
-        })
-        return client
+            raise PortalError(
+                "O portal do OK Entrega encerrou a conexão durante a autenticação. "
+                "Tente novamente em alguns minutos."
+            ) from exc
 
     async def _list_rows(self, client: httpx.AsyncClient, year: int) -> list[dict]:
         filtered = await client.post(AJAX_PATH, data={
