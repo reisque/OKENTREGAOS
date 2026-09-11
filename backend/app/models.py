@@ -1,8 +1,4 @@
-from pydantic import BaseModel, Field
-
-
-class ConsultationRequest(BaseModel):
-    os_numbers: list[str] = Field(min_length=1, max_length=30)
+from pydantic import BaseModel
 
 
 class OsResult(BaseModel):
@@ -17,3 +13,9 @@ class OsResult(BaseModel):
     has_xml: bool = False
     found: bool
     message: str | None = None
+
+
+class ConsultationResponse(BaseModel):
+    results: list[OsResult]
+    consulted_at: str
+    year: int

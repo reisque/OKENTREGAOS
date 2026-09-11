@@ -1,10 +1,11 @@
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from app.audit import ConsultationAudit
 from app.config import get_settings
-from app.models import ConsultationRequest, OsResult
+from app.models import ConsultationResponse, OsResult
 from app.portal import OkEntregaClient, PortalError
 
 settings = get_settings()
@@ -17,14 +18,18 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/api/consultations", response_model=list[OsResult])
-async def consultations(request: ConsultationRequest) -> list[OsResult]:
+@app.post("/api/consultations/sync", response_model=ConsultationResponse)
+async def consultations() -> ConsultationResponse:
+    year = datetime.now(timezone.utc).year
+    consulted_at = datetime.now(timezone.utc).isoformat()
     try:
-        results = await OkEntregaClient(settings).consult_many(request.os_numbers)
-        await ConsultationAudit(settings).record(results)
-        return results
+        results = await OkEntregaClient(settings).list_year(year)
+        await ConsultationAudit(settings).record(results, consulted_at)
+        return ConsultationResponse(results=results, consulted_at=consulted_at, year=year)
     except PortalError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/os/{os_number}/xml")

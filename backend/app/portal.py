@@ -1,5 +1,5 @@
-import asyncio
 import re
+from datetime import date
 from urllib.parse import urlparse
 
 import httpx
@@ -43,11 +43,12 @@ class OkEntregaClient:
         })
         return client
 
-    async def _find_row(self, client: httpx.AsyncClient, normalized: str) -> dict | None:
+    async def _list_rows(self, client: httpx.AsyncClient, year: int) -> list[dict]:
         filtered = await client.post(AJAX_PATH, data={
             "component": "sys.sys.busca2", "action": "reloadFieldFilters", "acao": "G",
-            "campDocumentos": normalized, "campTipoDoc": "os", "campSerieDocumentos": "",
+            "campDocumentos": "", "campTipoDoc": "os", "campSerieDocumentos": "",
             "campEmissorDoc": "", "usuarioClientes": 0, "pagina": CONSULTATION_PAGE,
+            "campDataInicial": f"01/01/{year}", "campDataFinal": f"31/12/{year}",
         })
         if filtered.json().get("resposta_status", {}).get("status") != 1:
             raise PortalError("O filtro não pôde ser aplicado no OK Entrega.")
@@ -58,7 +59,30 @@ class OkEntregaClient:
         payload = response.json()
         if payload.get("resposta_status", {}).get("status") != 1:
             raise PortalError(payload.get("resposta_status", {}).get("msg", "Falha ao consultar a OS."))
-        return next((row for row in payload.get("DATA", []) if normalize_os(row.get("NUMEROOS", "")) == normalized), None)
+        return payload.get("DATA", [])
+
+    async def list_year(self, year: int) -> list[OsResult]:
+        client = await self._authenticated_client()
+        try:
+            rows = await self._list_rows(client, year)
+            return [self._result_from_row(row) for row in rows if normalize_os(row.get("NUMEROOS", ""))]
+        finally:
+            await client.aclose()
+
+    @staticmethod
+    def _result_from_row(row: dict) -> OsResult:
+        number = row.get("NUMEROOS", "")
+        return OsResult(
+            input=number, normalized=normalize_os(number), os_number=number,
+            status=row.get("STATUSOS"), booking=row.get("BOOKING"),
+            container=row.get("RESULTADOVARCHAR"), contractor=row.get("NOMECLIENTEPROPOSTA"),
+            depot=row.get("DEPOT"), has_xml=".xml" in str(row.get("ARQUIVO", "")).lower(),
+            found=True,
+        )
+
+    async def _find_row(self, client: httpx.AsyncClient, normalized: str) -> dict | None:
+        rows = await self._list_rows(client, date.today().year)
+        return next((row for row in rows if normalize_os(row.get("NUMEROOS", "")) == normalized), None)
 
     async def consult(self, raw_os: str) -> OsResult:
         normalized = normalize_os(raw_os)
@@ -69,7 +93,7 @@ class OkEntregaClient:
             row = await self._find_row(client, normalized)
             if not row:
                 return OsResult(input=raw_os, normalized=normalized, found=False, message="OS não encontrada.")
-            return OsResult(input=raw_os, normalized=normalized, os_number=row.get("NUMEROOS"), status=row.get("STATUSOS"), booking=row.get("BOOKING"), container=row.get("RESULTADOVARCHAR"), contractor=row.get("NOMECLIENTEPROPOSTA"), depot=row.get("DEPOT"), has_xml=".xml" in str(row.get("ARQUIVO", "")).lower(), found=True)
+            return self._result_from_row(row).model_copy(update={"input": raw_os})
         finally:
             await client.aclose()
 
@@ -98,6 +122,3 @@ class OkEntregaClient:
             return file_response.content, f"{normalized}.xml", "application/xml"
         finally:
             await client.aclose()
-
-    async def consult_many(self, values: list[str]) -> list[OsResult]:
-        return await asyncio.gather(*(self.consult(value) for value in values))

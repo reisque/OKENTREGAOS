@@ -1,6 +1,6 @@
 # OK Entrega Consulta
 
-Consulta de OS e download de XML/PDF do OK Entrega, com React/Vite no Netlify e FastAPI no Render.
+Consulta anual de OS e download individual de XML do OK Entrega, com React/Vite no Netlify e FastAPI no Render.
 
 ## Ambiente local
 
@@ -11,7 +11,9 @@ Consulta de OS e download de XML/PDF do OK Entrega, com React/Vite no Netlify e 
 
 ## Supabase
 
-Execute a migration em `supabase/migrations/20260911_create_consultations.sql` no SQL Editor. As credenciais do OK Entrega ficam somente nas variáveis do Render: `OKENTREGA_EMAIL` e `OKENTREGA_PASSWORD`.
+Execute a migration em `supabase/migrations/20260911_create_consultations.sql` no SQL Editor. Na primeira abertura do site, a API busca as OS do ano corrente; cada atualização busca novamente o ano inteiro e faz upsert das OS novas ou alteradas. A pesquisa é feita sobre os resultados sincronizados no navegador, sem custo adicional de serviço.
+
+O site sincroniza automaticamente uma hora depois da última consulta concluída (manual ou automática). A data e a hora da última consulta ficam visíveis no topo. Os XMLs são baixados somente de forma individual para evitar travamentos no navegador.
 
 ## Publicação
 
