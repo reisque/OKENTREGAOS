@@ -6,6 +6,7 @@ from fastapi.responses import Response
 from app.audit import ConsultationAudit
 from app.config import get_settings
 from app.models import ConsultationResponse, OsResult
+from app.notifications import NotificationError, send_new_xml_email
 from app.portal import OkEntregaClient, PortalError
 
 settings = get_settings()
@@ -24,11 +25,17 @@ async def consultations() -> ConsultationResponse:
     consulted_at = datetime.now(timezone.utc).isoformat()
     try:
         results = await OkEntregaClient(settings).list_year(year)
-        await ConsultationAudit(settings).record(results, consulted_at)
+        audit = ConsultationAudit(settings)
+        newly_available = await audit.record(results, consulted_at)
+        if newly_available:
+            await send_new_xml_email(settings, newly_available, consulted_at)
+            await audit.mark_xmls_notified(newly_available, consulted_at)
         return ConsultationResponse(results=results, consulted_at=consulted_at, year=year)
     except PortalError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except NotificationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 

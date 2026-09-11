@@ -15,7 +15,10 @@ Execute a migration em `supabase/migrations/20260911_create_consultations.sql` n
 
 O site sincroniza automaticamente uma hora depois da última consulta concluída (manual ou automática). A data e a hora da última consulta ficam visíveis no topo. Os XMLs são baixados somente de forma individual para evitar travamentos no navegador.
 
+Para receber um e-mail agrupado quando um XML passar de indisponível para disponível, execute também `supabase/migrations/20260911161000_add_xml_notification.sql` no SQL Editor e configure no Render `RESEND_API_KEY`, `NOTIFICATION_EMAIL` e `RESEND_FROM_EMAIL`. O sistema envia no máximo um e-mail por sincronização e registra `xml_notified_at` para não repetir o aviso.
+
 ## Publicação
 
 - Netlify: conecte o repositório; a configuração em `netlify.toml` usa `frontend`, `npm run build` e `dist`. Configure `VITE_API_URL` com a URL HTTPS do Render.
 - Render: crie o Web Service pelo `render.yaml`. Defina `OKENTREGA_EMAIL`, `OKENTREGA_PASSWORD` e `ALLOWED_ORIGINS` com a URL exata do Netlify.
+- No Render, mantenha `RESEND_API_KEY` somente como variável secreta. Use `NOTIFICATION_EMAIL` para o destinatário e `RESEND_FROM_EMAIL` para um remetente autorizado no Resend.

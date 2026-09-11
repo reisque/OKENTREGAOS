@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:5173"
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
+    resend_api_key: str | None = None
+    notification_email: str | None = None
+    resend_from_email: str | None = None
 
     @property
     def cors_origins(self) -> list[str]:

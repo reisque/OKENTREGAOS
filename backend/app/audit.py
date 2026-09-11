@@ -16,16 +16,16 @@ class ConsultationAudit:
         if settings.supabase_url and settings.supabase_service_role_key:
             self.client = create_client(settings.supabase_url, settings.supabase_service_role_key)
 
-    async def record(self, results: list[OsResult], consulted_at: str) -> None:
+    async def record(self, results: list[OsResult], consulted_at: str) -> list[OsResult]:
         if not self.client:
-            return
+            return []
         existing: dict[str, dict[str, Any]] = {}
         try:
             offset = 0
             while True:
                 response = await asyncio.to_thread(
                     self.client.table("okentrega_consultations")
-                    .select("os_number,has_xml,cte_detected_at")
+                    .select("os_number,has_xml,cte_detected_at,xml_notified_at")
                     .range(offset, offset + 999)
                     .execute
                 )
@@ -37,6 +37,17 @@ class ConsultationAudit:
         except Exception as exc:
             logger.exception("Supabase previous consultation read failed")
             raise RuntimeError("Não foi possível comparar a disponibilidade anterior dos XMLs.") from exc
+        newly_available = [
+            result for result in results
+            if result.has_xml and (
+                existing.get(result.normalized, {}).get("has_xml") is False
+                or (
+                    result.normalized in existing
+                    and existing[result.normalized].get("xml_notified_at") is None
+                    and existing[result.normalized].get("cte_detected_at") is not None
+                )
+            )
+        ]
         rows = [{
             "os_number": result.normalized, "found": result.found, "status": result.status,
             "booking": result.booking, "container": result.container,
@@ -47,15 +58,31 @@ class ConsultationAudit:
                 existing.get(result.normalized, {}).get("cte_detected_at")
                 or (consulted_at if result.has_xml else None)
             ),
+            "xml_notified_at": existing.get(result.normalized, {}).get("xml_notified_at"),
         } for result in results]
         if not rows:
-            return
+            return newly_available
         try:
             await asyncio.to_thread(self.client.table("okentrega_consultations").upsert(rows, on_conflict="os_number").execute)
         except Exception as exc:
             logger.exception("Supabase upsert failed")
             detail = str(exc).replace("\n", " ")[:300]
             raise RuntimeError(f"Não foi possível salvar a consulta no Supabase: {detail}") from exc
+        return newly_available
+
+    async def mark_xmls_notified(self, results: list[OsResult], notified_at: str) -> None:
+        if not self.client or not results:
+            return
+        try:
+            await asyncio.to_thread(
+                self.client.table("okentrega_consultations")
+                .update({"xml_notified_at": notified_at})
+                .in_("os_number", [result.normalized for result in results])
+                .execute
+            )
+        except Exception as exc:
+            logger.exception("Supabase XML notification update failed")
+            raise RuntimeError("O e-mail foi enviado, mas não foi possível registrar o aviso no Supabase.") from exc
 
     async def latest(self) -> tuple[list[OsResult], str] | None:
         if not self.client:
