@@ -43,7 +43,7 @@ async def send_new_xml_email(settings: Settings, results: list[OsResult], detect
     message = EmailMessage()
     message["From"] = settings.gmail_sender
     message["To"] = settings.notification_email
-    message["Subject"] = f"Novos XMLs disponíveis - OK Entrega ({len(results)})"
+    message["Subject"] = f"Novos XMLs disponíveis - OK Coleta ({len(results)})"
     message.set_content(
         "Foram detectados novos XMLs para download:\n\n"
         f"{lines}\n\nDetectados em: {date_label}\n\n"
