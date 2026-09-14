@@ -6,6 +6,7 @@ from supabase import Client, create_client
 
 from app.config import Settings
 from app.models import OsResult
+from app.portal import is_sp_os
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class ConsultationAudit:
                     found=bool(row.get("found", True)),
                 )
                 for row in rows
-                if row.get("os_number")
+                if row.get("os_number") and is_sp_os(str(row["os_number"]))
             ]
             return results, consulted_at
         except Exception as exc:

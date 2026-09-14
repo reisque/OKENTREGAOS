@@ -20,6 +20,10 @@ def normalize_os(value: str) -> str:
     return re.sub(r"\s+", "", value).upper()
 
 
+def is_sp_os(value: str) -> bool:
+    return normalize_os(value).startswith("6SP")
+
+
 def first_value(row: dict, *names: str) -> str | None:
     for name in names:
         value = row.get(name)
@@ -119,7 +123,11 @@ class OkEntregaClient:
         client = await self._authenticated_client()
         try:
             rows = await self._list_rows(client, year)
-            return [self._result_from_row(row) for row in rows if normalize_os(row.get("NUMEROOS", ""))]
+            return [
+                self._result_from_row(row)
+                for row in rows
+                if is_sp_os(row.get("NUMEROOS", ""))
+            ]
         finally:
             await client.aclose()
 

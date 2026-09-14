@@ -7,7 +7,7 @@ from app.audit import ConsultationAudit
 from app.config import get_settings
 from app.models import ConsultationResponse, OsResult
 from app.gmail_notifications import NotificationError, send_new_xml_email
-from app.portal import OkEntregaClient, PortalError
+from app.portal import OkEntregaClient, PortalError, is_sp_os
 
 settings = get_settings()
 app = FastAPI(title="OK Entrega Consulta API")
@@ -54,6 +54,8 @@ async def latest_consultation() -> ConsultationResponse:
 
 @app.get("/api/os/{os_number}/xml")
 async def download_xml(os_number: str) -> Response:
+    if not is_sp_os(os_number):
+        raise HTTPException(status_code=404, detail="Apenas OS iniciadas com 6SP são permitidas.")
     try:
         content, filename, media_type = await OkEntregaClient(settings).download_xml(os_number)
     except PortalError as exc:

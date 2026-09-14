@@ -70,7 +70,7 @@ export default function App() {
   function download(os: string) { window.open(`${apiUrl}/api/os/${encodeURIComponent(normalizedOs(os))}/xml`, '_blank', 'noopener,noreferrer') }
 
   function applyBatchFilter() {
-    setBatchFilter(batchQuery.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+    setBatchFilter(batchQuery.split(/\r?\n/).map(line => line.trim()).filter(line => normalizedOs(line).startsWith('6SP')))
     setPage(1)
   }
 
