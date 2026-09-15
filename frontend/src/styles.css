@@ -50,6 +50,8 @@ button { transition: transform .2s ease, box-shadow .2s ease, background-color .
 .panel { padding: 24px; }
 .panel label { display: block; margin: 19px 0 8px; color: var(--navy); font-size: .82rem; font-weight: 800; letter-spacing: .01em; }
 .sync-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--ink-muted); font-size: .84rem; }
+.sync-bar > span { display: flex; flex-direction: column; gap: 2px; }
+.sync-bar > span span { display: block; }
 .sync-bar button, .batch-actions button, .pagination button {
   display: inline-flex;
   align-items: center;
