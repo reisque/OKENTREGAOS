@@ -28,7 +28,14 @@ async def consultations() -> ConsultationResponse:
         audit = ConsultationAudit(settings)
         persisted_results, newly_available = await audit.record(results, consulted_at)
         if newly_available:
-            await send_new_xml_email(settings, newly_available, consulted_at)
+            portal_client = OkEntregaClient(settings)
+            attachments = {}
+            for result in newly_available:
+                if not result.os_number:
+                    raise RuntimeError("Uma OS nova não possui identificador para baixar o XML.")
+                content, filename, media_type = await portal_client.download_xml(result.os_number)
+                attachments[result.normalized] = (content, filename, media_type)
+            await send_new_xml_email(settings, newly_available, consulted_at, attachments)
             await audit.mark_xmls_notified(newly_available, consulted_at)
         return ConsultationResponse(results=persisted_results, consulted_at=consulted_at, year=year)
     except PortalError as exc:

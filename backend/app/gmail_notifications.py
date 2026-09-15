@@ -26,19 +26,26 @@ async def _access_token(settings: Settings) -> str:
         })
     if response.status_code >= 400:
         raise NotificationError("O Google recusou as credenciais OAuth da Gmail API.")
-    payload = response.json()
-    token = payload.get("access_token")
+    token = response.json().get("access_token")
     if not token:
         raise NotificationError("O Google não retornou um token de acesso para a Gmail API.")
     return token
 
 
-async def send_new_xml_email(settings: Settings, results: list[OsResult], detected_at: str) -> None:
+async def send_new_xml_email(
+    settings: Settings,
+    results: list[OsResult],
+    detected_at: str,
+    attachments: dict[str, tuple[bytes, str, str]],
+) -> None:
     if not results:
         return
     if not settings.notification_email:
         raise NotificationError("Configure NOTIFICATION_EMAIL no Render.")
-    date_label = datetime.fromisoformat(detected_at.replace("Z", "+00:00")).strftime("%d/%m/%Y %H:%M")
+
+    date_label = datetime.fromisoformat(
+        detected_at.replace("Z", "+00:00")
+    ).strftime("%d/%m/%Y %H:%M")
     lines = "\n".join(f"- {result.os_number or result.input}" for result in results)
     message = EmailMessage()
     message["From"] = settings.gmail_sender
@@ -49,6 +56,20 @@ async def send_new_xml_email(settings: Settings, results: list[OsResult], detect
         f"{lines}\n\nDetectados em: {date_label}\n\n"
         "Acesse o sistema para baixar os arquivos individualmente."
     )
+
+    for result in results:
+        attachment = attachments.get(result.normalized)
+        if attachment is None:
+            raise NotificationError(f"XML não disponível para a OS {result.normalized}.")
+        content, filename, media_type = attachment
+        maintype, subtype = media_type.split("/", 1)
+        message.add_attachment(
+            content,
+            maintype=maintype,
+            subtype=subtype,
+            filename=filename,
+        )
+
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
     token = await _access_token(settings)
     async with httpx.AsyncClient(timeout=20) as client:
