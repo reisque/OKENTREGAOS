@@ -102,17 +102,17 @@ button:disabled { opacity: .55; cursor: not-allowed; transform: none !important;
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th { position: sticky; top: 0; z-index: 1; padding: 12px 9px; background: #edf5fa; color: #527088; font-size: .62rem; font-weight: 850; letter-spacing: .06em; text-align: center; text-transform: uppercase; white-space: nowrap; }
 th:nth-child(1) { width: 12%; } th:nth-child(2) { width: 13%; } th:nth-child(3) { width: 13%; } th:nth-child(4) { width: 13%; } th:nth-child(5) { width: 11%; } th:nth-child(6) { width: 12%; } th:nth-child(7) { width: 13%; } th:nth-child(8) { width: 13%; } th:nth-child(9) { width: 10%; }
-td { padding: 11px 9px; border-top: 1px solid #e6eef4; color: #23445d; font-size: .77rem; font-weight: 500; line-height: 1.3; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td { padding: 11px 9px; border-top: 1px solid #e6eef4; color: var(--navy); font-size: .77rem; font-weight: 500; line-height: 1.3; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tbody tr { height: 62px; transition: background-color .18s ease; }
 tbody tr:hover { background: #f6fbfe; }
-.os-cell { color: var(--navy); font-size: .77rem; font-weight: 500; }
-.date-cell { color: #3b5c73; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.status { display: block; padding: 0; overflow: hidden; color: #176336; font-size: .77rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.os-cell, .date-cell, .status { color: var(--navy); font-size: .77rem; font-weight: 500; }
+.date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status { display: block; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; justify-content: center; gap: 5px; }
 .actions button { display: inline-flex; align-items: center; gap: 4px; padding: 8px 7px; border: 0; border-radius: 9px; background: var(--orange); color: #fff; font-size: .67rem; font-weight: 800; cursor: pointer; }
 .actions button:hover { background: var(--orange-dark); box-shadow: 0 7px 15px rgba(245, 130, 32, .24); transform: translateY(-1px); }
 .actions .na { background: #b7c4cc; color: #fff; cursor: default; }
-.not-found td { color: #8a3744; background: #fff8f8; }
+.not-found td { color: var(--navy); background: #fff8f8; }
 .not-found .os-cell { color: var(--navy); }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; color: var(--ink-muted); font-size: .82rem; font-weight: 700; }
 .pagination button { padding: 8px 13px; }
