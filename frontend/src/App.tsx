@@ -109,6 +109,11 @@ export default function App() {
     return requestedResults.filter(item => inDateRange(item.integration_date, integrationStart, integrationEnd)
       && inDateRange(item.cte_detected_at, cteStart, cteEnd)
       && (!term || Object.values(item).some(value => String(value ?? '').toLocaleLowerCase().includes(term))))
+      .sort((left, right) => {
+        const leftDate = left.integration_date ? new Date(left.integration_date).getTime() : Number.NEGATIVE_INFINITY
+        const rightDate = right.integration_date ? new Date(right.integration_date).getTime() : Number.NEGATIVE_INFINITY
+        return rightDate - leftDate
+      })
   }, [batchFilter, cteEnd, cteStart, integrationEnd, integrationStart, query, results])
   const pageSize = 100
   const pageCount = Math.max(1, Math.ceil(visibleResults.length / pageSize))
