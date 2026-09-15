@@ -62,7 +62,7 @@ export default function App() {
   useEffect(() => {
     if (!consultedAt) return
     const elapsed = Date.now() - new Date(consultedAt).getTime()
-    const remaining = Math.max(0, 60 * 60 * 1000 - elapsed)
+    const remaining = Math.max(0, 30 * 60 * 1000 - elapsed)
     const timer = window.setTimeout(() => void sync(), remaining)
     return () => window.clearTimeout(timer)
   }, [consultedAt])

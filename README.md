@@ -11,9 +11,9 @@ Consulta anual de OS e download individual de XML do OK Entrega, com React/Vite 
 
 ## Supabase
 
-Execute a migration em `supabase/migrations/20260911_create_consultations.sql` no SQL Editor. A primeira abertura busca as OS do ano corrente e salva os dados no Supabase. Nas aberturas seguintes, o site carrega a última consulta salva no banco, sem consultar o portal novamente. Uma nova consulta anual só acontece pelo botão de atualização ou quando completar uma hora desde a última consulta; nesse caso, as OS novas ou alteradas são gravadas por upsert. A pesquisa é feita sobre os resultados sincronizados no navegador, sem custo adicional de serviço.
+Execute a migration em `supabase/migrations/20260911_create_consultations.sql` no SQL Editor. A primeira abertura busca as OS do ano corrente e salva os dados no Supabase. Nas aberturas seguintes, o site carrega a última consulta salva no banco, sem consultar o portal novamente. Uma nova consulta anual só acontece pelo botão de atualização ou quando completar 30 minutos desde a última consulta; nesse caso, as OS novas ou alteradas são gravadas por upsert. A pesquisa é feita sobre os resultados sincronizados no navegador, sem custo adicional de serviço.
 
-O site sincroniza automaticamente uma hora depois da última consulta concluída (manual ou automática). A data e a hora da última consulta ficam visíveis no topo. Os XMLs são baixados somente de forma individual para evitar travamentos no navegador.
+O site sincroniza automaticamente 30 minutos depois da última consulta concluída (manual ou automática). A data e a hora da última consulta ficam visíveis no topo. Os XMLs são baixados somente de forma individual para evitar travamentos no navegador.
 
 Para receber um e-mail agrupado quando um XML passar de indisponível para disponível, execute também `supabase/migrations/20260911161000_add_xml_notification.sql` no SQL Editor e configure a Gmail API no Render. O sistema envia no máximo um e-mail por sincronização e registra `xml_notified_at` para não repetir o aviso.
 
