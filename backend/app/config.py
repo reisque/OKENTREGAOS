@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     google_refresh_token: str | None = None
     gmail_sender: str = "caiqueteles.uni@gmail.com"
     notification_email: str | None = None
+    sync_secret: str | None = None
 
     @property
     def cors_origins(self) -> list[str]:

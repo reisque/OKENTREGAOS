@@ -15,6 +15,8 @@ Execute a migration em `supabase/migrations/20260911_create_consultations.sql` n
 
 O site sincroniza automaticamente 30 minutos depois da última consulta concluída (manual ou automática). A data e a hora da última consulta ficam visíveis no topo. Os XMLs são baixados somente de forma individual para evitar travamentos no navegador.
 
+O GitHub Actions também executa a sincronização a cada 30 minutos, mesmo sem o site aberto. Configure o mesmo valor secreto em `SYNC_SECRET` no Render e nos Secrets do repositório no GitHub. O workflow pode ser executado manualmente pela aba Actions para testar.
+
 Para receber um e-mail agrupado quando um XML passar de indisponível para disponível, execute também `supabase/migrations/20260911161000_add_xml_notification.sql` no SQL Editor e configure a Gmail API no Render. O sistema envia no máximo um e-mail por sincronização e registra `xml_notified_at` para não repetir o aviso.
 
 ## Publicação

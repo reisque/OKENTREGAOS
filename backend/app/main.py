@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException
+from hmac import compare_digest
+
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -19,8 +21,7 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/api/consultations/sync", response_model=ConsultationResponse)
-async def consultations() -> ConsultationResponse:
+async def run_consultation() -> ConsultationResponse:
     year = datetime.now(timezone.utc).year
     consulted_at = datetime.now(timezone.utc).isoformat()
     try:
@@ -44,6 +45,18 @@ async def consultations() -> ConsultationResponse:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except NotificationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/consultations/sync", response_model=ConsultationResponse)
+async def consultations() -> ConsultationResponse:
+    return await run_consultation()
+
+
+@app.post("/api/consultations/scheduled-sync", response_model=ConsultationResponse)
+async def scheduled_consultation(x_sync_secret: str | None = Header(default=None)) -> ConsultationResponse:
+    if not settings.sync_secret or not x_sync_secret or not compare_digest(x_sync_secret, settings.sync_secret):
+        raise HTTPException(status_code=401, detail="Credencial de sincronização inválida.")
+    return await run_consultation()
 
 
 @app.get("/api/consultations/latest", response_model=ConsultationResponse)
