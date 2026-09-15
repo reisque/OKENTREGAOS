@@ -26,17 +26,8 @@ body {
 button, input, textarea { font: inherit; }
 button { transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, opacity .2s ease; }
 
-.page { max-width: 1320px; margin: 0 auto; padding: 42px 24px 56px; }
-.hero { position: relative; padding: 10px 4px 4px; animation: rise-in .55s ease both; }
-.hero::before {
-  display: block;
-  width: 64px;
-  height: 5px;
-  margin-bottom: 16px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--blue), var(--orange));
-  content: "";
-}
+.page { max-width: 1320px; margin: 0 auto; padding: 18px 24px 56px; }
+.hero { position: relative; padding: 0 4px 4px; animation: rise-in .55s ease both; }
 .hero h1 { margin: 0; color: var(--navy); font-size: clamp(1.8rem, 3.5vw, 3rem); line-height: 1.08; letter-spacing: -.045em; }
 
 .panel, .results {
@@ -77,7 +68,7 @@ button { transition: transform .2s ease, box-shadow .2s ease, background-color .
   color: #12324d;
   outline: 0;
 }
-.batch-query textarea { min-height: 96px; padding: 11px 13px; resize: vertical; line-height: 1.45; }
+.batch-query textarea { min-height: 72px; padding: 11px 13px; resize: vertical; line-height: 1.45; }
 .batch-query textarea:focus, .search-input:focus-within, .date-filters input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(11, 111, 174, .11); }
 .batch-actions { display: flex; min-width: 132px; flex-direction: column; gap: 8px; }
 .batch-actions button { padding: 10px 12px; }
